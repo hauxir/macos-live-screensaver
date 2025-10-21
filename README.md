@@ -1,4 +1,4 @@
-# macos-live-screensaver
+# MacOS Live Screensaver
 
 A macOS screensaver that plays live video streams. Supports YouTube videos and direct HLS streams.
 
