@@ -13,6 +13,7 @@ swiftc -emit-library \
   -framework ScreenSaver \
   -framework AVFoundation \
   -framework Cocoa \
+  -framework Quartz \
   screensaver.swift
 
 cp Info.plist build/LiveScreensaver.saver/Contents/Info.plist

@@ -2,6 +2,7 @@ import ScreenSaver
 import AVFoundation
 import CryptoKit
 import Cocoa
+import Quartz
 
 private let ModuleName = "com.livescreensaver.app"
 private let URLKey = "HLSStreamURL"
@@ -22,9 +23,26 @@ class LiveScreensaverView: ScreenSaverView {
     private var stallDetectionTime: Date?
     private let stallTimeoutSeconds: TimeInterval = 10
     private var currentSourceURL: String?
+    private var startTime = Date()
 
     private static let expirationRegex = try? NSRegularExpression(pattern: "expire/([0-9]+)", options: [])
     private static let preferredTimescale: CMTimeScale = 600
+
+    private func getSystemIdleTime() -> TimeInterval {
+        return CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: .mouseMoved)
+    }
+
+    private func isScreenLocked() -> Bool {
+        guard let sessionDict = CGSessionCopyCurrentDictionary() as? [String: Any] else {
+            return false
+        }
+
+        if let isLocked = sessionDict["CGSSessionScreenIsLocked"] as? Bool {
+            return isLocked
+        }
+
+        return false
+    }
 
     override init?(frame: NSRect, isPreview: Bool) {
         super.init(frame: frame, isPreview: isPreview)
@@ -379,6 +397,22 @@ class LiveScreensaverView: ScreenSaverView {
     }
 
     override func animateOneFrame() {
+        if !isPreview && Date().timeIntervalSince(startTime) > 2.0 {
+            let idleTime = getSystemIdleTime()
+            let screenLocked = isScreenLocked()
+            if idleTime < 1.0 && !screenLocked {
+                player?.pause()
+                player?.replaceCurrentItem(with: nil)
+                exit(0)
+            }
+        }
+
+        if isPreview && Date().timeIntervalSince(startTime) > 120 {
+            player?.pause()
+            player?.replaceCurrentItem(with: nil)
+            exit(0)
+        }
+
         playerLayer?.frame = bounds
 
         guard let player = player, let playerItem = playerItem else { return }
