@@ -2,10 +2,6 @@
 
 A macOS screensaver that plays live video streams. Supports YouTube videos and direct HLS streams.
 
-**Disclaimer**: This project was entirely vibe-coded. I've never written Swift before in my life.
-
-**Note**: This was tested exclusively on macOS Tahoe on an M2 MacBook. Your mileage may vary on other versions/hardware.
-
 ## Why?
 
 Turn any live stream into your screensaver/lockscreen. Some examples:
@@ -25,6 +21,10 @@ Turn any live stream into your screensaver/lockscreen. Some examples:
 - macOS
 - Swift compiler (Xcode Command Line Tools)
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) (optional, for YouTube support)
+
+**Disclaimer**: This project was entirely vibe-coded. I've never written Swift before in my life.
+
+**Note**: This was tested exclusively on macOS Tahoe on an M2 MacBook. Your mileage may vary on other versions/hardware.
 
 ## Installation
 
