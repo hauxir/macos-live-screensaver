@@ -69,7 +69,7 @@ cp -r build/LiveScreensaver.saver ~/Library/Screen\ Savers/
 **Note**: Only live YouTube videos are supported. Regular (non-live) YouTube videos will not work.
 
 **Note**: macOS screensaver UI can be buggy. If the Options button is unresponsive, try closing and reopening System Settings. PRs welcome for anyone who can figure out why.
-
+<img width="526" height="587" alt="Image" src="https://github.com/user-attachments/assets/67d314ff-e17e-43bc-baed-df20c9ece80b" />
 ## Troubleshooting
 
 **YouTube videos don't play**:
