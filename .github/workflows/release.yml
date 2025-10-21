@@ -1,0 +1,71 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-release:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Build screensaver
+      run: |
+        chmod +x build.sh
+        ./build.sh
+
+    - name: Verify build output
+      run: |
+        if [ ! -d "build/LiveScreensaver.saver" ]; then
+          echo "Build failed: LiveScreensaver.saver not found"
+          exit 1
+        fi
+        echo "Build successful"
+        ls -la build/
+
+    - name: Create ZIP archive
+      run: |
+        cd build
+        zip -r LiveScreensaver.saver.zip LiveScreensaver.saver
+        cd ..
+        mv build/LiveScreensaver.saver.zip .
+
+    - name: Update Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: latest
+        name: Latest Build
+        files: LiveScreensaver.saver.zip
+        body: |
+          ## Installation
+
+          1. Download `LiveScreensaver.saver.zip`
+          2. Unzip the file
+          3. Double-click `LiveScreensaver.saver` to install
+
+          ## Requirements
+
+          - macOS (tested on macOS Sequoia)
+          - For YouTube support: Install [yt-dlp](https://github.com/yt-dlp/yt-dlp)
+            ```bash
+            brew install yt-dlp
+            ```
+
+          ## Usage
+
+          After installation:
+          1. Go to System Settings → Screen Saver
+          2. Select "Live Screensaver"
+          3. Click "Options" to configure your stream URL
+
+          ---
+          **Built from commit:** ${{ github.sha }}
+          **Build date:** ${{ github.event.head_commit.timestamp }}
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
