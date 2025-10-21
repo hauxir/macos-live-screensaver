@@ -10,13 +10,13 @@ A macOS screensaver that plays live video streams. Supports YouTube videos and d
 
 Turn any live stream into your screensaver/lockscreen. Some examples:
 
-### Namib Desert Wildlife
+### [Namib Desert Wildlife](https://www.youtube.com/watch?v=ydYDqZQpim8)
 <img width="640" height="360" alt="Image" src="https://github.com/user-attachments/assets/19b39408-8d67-4699-87c9-bb218198190d" />
 
-### Times Square
+### [Times Square](https://www.youtube.com/watch?v=rnXIjl_Rzy4)
 <img width="640" height="360" alt="Image" src="https://github.com/user-attachments/assets/5db52a77-24a2-4bd1-9698-d3f2258b4890" />
 
-### The News
+### [The News](https://www.youtube.com/watch?v=iipR5yUp36o)
 
 <img width="640" height="360" alt="Image" src="https://github.com/user-attachments/assets/1d528a72-3d1b-4151-8e9c-347cdfe8d94c" />
 
