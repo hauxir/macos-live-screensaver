@@ -42,19 +42,22 @@ pip install yt-dlp
 
 ### Build and Install
 
-1. Build:
+Build and install:
 ```bash
-bash build.sh
+make install
 ```
 
-2. Install:
+Or step by step:
 ```bash
+make build
 open build/LiveScreensaver.saver
 ```
 
-Or manually:
+Other commands:
 ```bash
-cp -r build/LiveScreensaver.saver ~/Library/Screen\ Savers/
+make clean      # Remove build directory
+make uninstall  # Remove screensaver from ~/Library/Screen Savers/
+make start      # Trigger screensaver immediately
 ```
 
 ## Usage
