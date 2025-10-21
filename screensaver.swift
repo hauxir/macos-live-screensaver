@@ -397,7 +397,7 @@ class LiveScreensaverView: ScreenSaverView {
     }
 
     override func animateOneFrame() {
-        if !isPreview && Date().timeIntervalSince(startTime) > 2.0 {
+        if Date().timeIntervalSince(startTime) > 2.0 {
             let idleTime = getSystemIdleTime()
             let screenLocked = isScreenLocked()
             if idleTime < 1.0 && !screenLocked {
@@ -405,12 +405,6 @@ class LiveScreensaverView: ScreenSaverView {
                 player?.replaceCurrentItem(with: nil)
                 exit(0)
             }
-        }
-
-        if isPreview && Date().timeIntervalSince(startTime) > 120 {
-            player?.pause()
-            player?.replaceCurrentItem(with: nil)
-            exit(0)
         }
 
         playerLayer?.frame = bounds
