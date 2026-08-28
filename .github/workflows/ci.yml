@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+# A newer push to the same branch makes an in-flight run irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Show toolchain versions
+        run: |
+          sw_vers
+          swiftc --version
+          xcodebuild -version
+
+      - name: Build screensaver
+        run: make build
+
+      - name: Verify bundle structure
+        run: make verify
+
+      - name: Run unit tests
+        run: make test
+
+  format:
+    name: Format
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install swift-format
+        run: brew install swift-format
+
+      # Advisory, because the existing sources have never been through the
+      # formatter and doing that is one `make format` run on a machine with the
+      # toolchain. Findings are surfaced as annotations rather than failing every
+      # pull request over pre-existing style.
+      #
+      # Note: `continue-on-error` is NOT the way to do this. It stops the run
+      # being marked failed, but the check itself still reports failure, so every
+      # PR shows a red cross for a job that is working as intended.
+      #
+      # Once the tree is clean, replace this whole step with `run: make lint`.
+      # Tracked in SAVE-hrpq.
+      - name: Check formatting (advisory)
+        run: |
+          if make lint > lint.log 2>&1; then
+            echo "Formatting is clean."
+          else
+            echo "::warning::swift-format found formatting differences. Run 'make format' locally to fix them."
+            cat lint.log
+          fi

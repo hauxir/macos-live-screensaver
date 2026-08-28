@@ -2,44 +2,160 @@ name: Build and Release
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'
+  # Manual escape hatch for re-running a release without moving a tag.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build, without the leading v (e.g. 1.2.0)'
+        required: true
 
 jobs:
   build-and-release:
     runs-on: macos-latest
     permissions:
       contents: write
+      id-token: write
+      attestations: write
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        fetch-depth: 0   # release notes need the previous tag
 
-    - name: Build screensaver
-      run: make build
-
-    - name: Verify build output
+    # The tag is the version. Strip the leading "v" so it can go straight into
+    # CFBundleShortVersionString, which must be a plain dotted number.
+    - name: Determine version
+      id: version
       run: |
-        if [ ! -d "build/LiveScreensaver.saver" ]; then
-          echo "Build failed: LiveScreensaver.saver not found"
+        set -euo pipefail
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ inputs.version }}"
+        else
+          VERSION="${GITHUB_REF_NAME#v}"
+        fi
+        if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+          echo "::error::Version '$VERSION' is not X.Y.Z - tag releases as vX.Y.Z"
           exit 1
         fi
-        echo "Build successful"
-        ls -la build/
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "Building version $VERSION"
 
+    # Signing only engages when the secrets are present, so a fork -- which has
+    # none of them -- still gets a working (ad-hoc, unnotarised) build rather
+    # than a red workflow.
+    - name: Check for signing credentials
+      id: creds
+      env:
+        MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+        ASC_PRIVATE_KEY_BASE64: ${{ secrets.ASC_PRIVATE_KEY_BASE64 }}
+      run: |
+        if [ -n "$MACOS_CERT_P12_BASE64" ] && [ -n "$ASC_PRIVATE_KEY_BASE64" ]; then
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "signed=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::Signing secrets absent - producing an ad-hoc build that Gatekeeper will reject."
+        fi
+
+    - name: Import signing certificate
+      if: steps.creds.outputs.signed == 'true'
+      id: import
+      env:
+        MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+        MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      run: |
+        set -euo pipefail
+        CERT_PATH="$RUNNER_TEMP/certificate.p12"
+        KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+        # Nothing outside this job ever needs this password -- the keychain is
+        # created and destroyed within the run, so there's nothing to store.
+        KEYCHAIN_PASSWORD=$(openssl rand -base64 24)
+
+        echo -n "$MACOS_CERT_P12_BASE64" | base64 --decode > "$CERT_PATH"
+
+        security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+        security set-keychain-settings -lut 900 "$KEYCHAIN_PATH"
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+        security import "$CERT_PATH" -P "$MACOS_CERT_PASSWORD" \
+          -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+        # Let codesign use the key without an interactive prompt.
+        security set-key-partition-list -S apple-tool:,apple:,codesign: \
+          -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" > /dev/null
+        security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+        rm -f "$CERT_PATH"
+        security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
+        # The cert identifies the Apple Developer Team, not this app, so the
+        # full identity string is read out of the keychain rather than stored.
+        IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+          | grep "Developer ID Application" | grep "($APPLE_TEAM_ID)" \
+          | sed -E 's/.*"(.*)".*/\1/' | head -1)
+        test -n "$IDENTITY" || { echo "::error::No Developer ID Application identity for team $APPLE_TEAM_ID in the imported certificate"; exit 1; }
+        echo "identity=$IDENTITY" >> "$GITHUB_OUTPUT"
+
+    - name: Build screensaver
+      env:
+        SIGN_IDENTITY: ${{ steps.creds.outputs.signed == 'true' && steps.import.outputs.identity || '-' }}
+      run: |
+        make build \
+          SIGN_IDENTITY="$SIGN_IDENTITY" \
+          VERSION="${{ steps.version.outputs.version }}" \
+          BUILD_NUMBER="${{ github.run_number }}"
+
+    - name: Verify build output
+      run: make verify VERSION="${{ steps.version.outputs.version }}"
+
+    - name: Notarize and staple
+      if: steps.creds.outputs.signed == 'true'
+      env:
+        ASC_PRIVATE_KEY_BASE64: ${{ secrets.ASC_PRIVATE_KEY_BASE64 }}
+        ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+        ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      run: |
+        set -euo pipefail
+        export ASC_KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
+        echo -n "$ASC_PRIVATE_KEY_BASE64" | base64 --decode > "$ASC_KEY_PATH"
+        trap 'rm -f "$ASC_KEY_PATH"' EXIT
+        make notarize
+
+    - name: Confirm Gatekeeper acceptance
+      if: steps.creds.outputs.signed == 'true'
+      run: make assess
+
+    # Runs even if a step above failed, so signing material never outlives the job.
+    - name: Clean up keychain
+      if: always()
+      run: |
+        security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true
+        rm -f "$RUNNER_TEMP/certificate.p12" "$RUNNER_TEMP/AuthKey.p8"
+
+    # ditto preserves the bundle's signature and extended attributes; `zip` does
+    # not, and would invalidate the signature we just applied.
+    # The artefact carries its version, so a downloaded file is identifiable
+    # long after it has left the release page.
     - name: Create ZIP archive
       run: |
-        cd build
-        zip -r LiveScreensaver.saver.zip LiveScreensaver.saver
-        cd ..
-        mv build/LiveScreensaver.saver.zip .
+        ditto -c -k --keepParent build/LiveScreensaver.saver \
+          "LiveScreensaver-${{ steps.version.outputs.version }}.zip"
 
-    - name: Update Release
-      uses: softprops/action-gh-release@v2
+    # Keyless (OIDC/Sigstore) provenance attestation - no credentials needed,
+    # so this runs regardless of whether Developer ID signing was available.
+    - name: Attest build provenance
+      uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
       with:
-        tag_name: latest
-        name: Latest Build
-        files: LiveScreensaver.saver.zip
+        subject-path: LiveScreensaver-${{ steps.version.outputs.version }}.zip
+
+    - name: Publish release
+      uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+      with:
+        tag_name: v${{ steps.version.outputs.version }}
+        name: v${{ steps.version.outputs.version }}
+        files: LiveScreensaver-${{ steps.version.outputs.version }}.zip
+        generate_release_notes: true
         draft: false
         prerelease: false
       env:

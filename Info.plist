@@ -7,20 +7,27 @@
 	<key>CFBundleExecutable</key>
 	<string>LiveScreensaver</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.livescreensaver.app</string>
+	<string>me.byjp.livescreensaver</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>Live Screensaver</string>
 	<key>CFBundlePackageType</key>
 	<string>BNDL</string>
+	<!-- CFBundleShortVersionString and CFBundleVersion are overwritten at build
+	     time by the Makefile from VERSION/BUILD_NUMBER. The values here are the
+	     placeholders used by an unversioned local build. -->
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>0.0.0</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>0</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
 	<key>NSPrincipalClass</key>
 	<string>LiveScreensaverView</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © 2025. All rights reserved.</string>
+	<string>Copyright © 2025-2026 Live Screensaver Contributors. MIT licensed.</string>
 </dict>
 </plist>
